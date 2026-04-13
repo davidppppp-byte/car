@@ -5,22 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>蒙恩車輛管理系統</title>
     
-    <!-- 1. 核心框架 (按序載入) -->
+    <!-- 1. 核心基礎庫 (順序極重要：React 必須最先載入) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- 2. 圖示庫處理 (UMD 版本) -->
+    <!-- 2. 手動對應 Lucide 依賴：讓 lucide-react 能夠正確連結 React 全域變數 -->
     <script>
         window.react = window.React;
         window.reactDOM = window.ReactDOM;
     </script>
-    <script src="https://unpkg.com/lucide-react@latest"></script>
+    <!-- 使用特定穩定版本的 Lucide React -->
+    <script src="https://unpkg.com/lucide-react@0.344.0/dist/umd/lucide-react.js"></script>
 
-    <!-- 3. 編譯引擎 (穩定相容版) -->
+    <!-- 3. 編譯引擎 (穩定版本) -->
     <script src="https://unpkg.com/@babel/standalone@7.24.2/babel.min.js"></script>
 
-    <!-- 4. Firebase 相容版 SDK -->
+    <!-- 4. Firebase 相容模式 SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -42,13 +43,12 @@
             background: #ffffff; 
             display: flex;
             flex-direction: column;
-            box-shadow: 0 0 50px rgba(0,0,0,0.1);
+            box-shadow: 0 0 60px rgba(0,0,0,0.1);
         }
         .animate-fade { animation: fadeIn 0.3s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .tap-active:active { transform: scale(0.96); transition: transform 0.1s; }
         input, select, textarea { font-size: 16px !important; width: 100%; box-sizing: border-box; }
-        /* 避免長文字撐破版面 */
         .break-text { word-break: break-all; white-space: normal; }
     </style>
 </head>
@@ -56,7 +56,7 @@
     <div id="root">
         <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: #fff;">
             <div style="width: 35px; height: 35px; border: 3px solid #f3f3f3; border-top: 3px solid #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
-            <p style="margin-top: 20px; font-size: 14px; color: #64748b; font-weight: 500;">蒙恩系統啟動中...</p>
+            <p style="margin-top: 20px; font-size: 14px; color: #64748b; font-weight: 500;">蒙恩管理系統初始化...</p>
         </div>
     </div>
 
@@ -66,11 +66,11 @@
         (function() {
             const { useState, useEffect, useMemo } = React;
             
-            // 安全圖示組件
+            // 強化版安全圖示解析器：支援多種載入路徑
             const Icon = ({ name, size = 20, className = "", color = "currentColor" }) => {
-                const lib = window.LucideReact || {};
+                const lib = window.LucideReact || window.lucide || {};
                 const Comp = lib[name];
-                if (!Comp) return <div style={{width:size, height:size}} className="bg-slate-100 rounded" />;
+                if (!Comp) return <div style={{width:size, height:size}} className="bg-slate-200 rounded" />;
                 return <Comp size={size} className={className} color={color} />;
             };
 
@@ -87,7 +87,7 @@
             if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
             const db = firebase.firestore();
             const auth = firebase.auth();
-            const STORAGE_KEY = "deafcar-fleet-v20"; 
+            const STORAGE_KEY = "deafcar-fleet-v20-stable"; 
 
             const VEHICLES = [
                 { id: 'BFG-2353', name: '自排得利卡', plate: 'BFG-2353', type: 'van', hasBooking: false },
@@ -214,7 +214,7 @@
                             <div className="py-12 text-center">
                                 <div className="w-16 h-16 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-xl shadow-blue-100"><Icon name="Car" size={32} className="text-white" /></div>
                                 <h1 className="text-2xl font-black text-slate-800 tracking-tight">蒙恩車輛管理系統</h1>
-                                <p className="text-slate-400 text-xs mt-1 font-bold uppercase tracking-widest">Fleet Management</p>
+                                <p className="text-slate-400 text-xs mt-1 font-bold uppercase tracking-widest">Fleet Operations</p>
                             </div>
                             <div className="grid gap-4">
                                 {VEHICLES.map(v => (
@@ -232,9 +232,8 @@
                 // 畫面 B：管理介面
                 return (
                     <div className="app-container relative overflow-hidden animate-fade">
-                        <header className="bg-white border-b px-4 py-3 flex justify-between items-center shrink-0 z-10">
-                            {/* 修復後的返回鍵 */}
-                            <button onClick={() => setSelectedCar(null)} className="p-2 text-slate-400 hover:bg-slate-50 rounded-full transition-colors active:scale-90"><Icon name="ChevronLeft" size={28} /></button>
+                        <header className="bg-white border-b px-4 py-3 flex justify-between items-center shrink-0 z-10 shadow-sm">
+                            <button onClick={() => setSelectedCar(null)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-all active:scale-90"><Icon name="ChevronLeft" size={28} /></button>
                             <div className="text-center flex-1">
                                 <div className="text-[10px] font-black text-blue-600 tracking-tighter uppercase">{selectedCar.plate}</div>
                                 <h1 className="text-base font-black text-slate-800">{selectedCar.name}</h1>
@@ -246,10 +245,14 @@
                             {currentTab === 'bookings' && selectedCar.hasBooking && (
                                 <div className="space-y-5 animate-fade">
                                     <div className="flex justify-between items-center"><h2 className="font-black text-slate-800 text-lg flex items-center gap-2"><Icon name="Calendar" className="text-blue-500"/> 預約表</h2><button onClick={() => setModal({open:true, type:'booking', data:{}})} className="bg-blue-600 text-white p-2.5 rounded-full shadow-lg tap-active"><Icon name="Plus"/></button></div>
-                                    {filteredBookings.length === 0 ? <div className="text-center py-20 text-slate-300 text-sm font-bold">目前無預約登記</div> : filteredBookings.map(b => (
+                                    {filteredBookings.length === 0 ? <div className="text-center py-20 text-slate-300 font-bold text-sm">目前無預約登記</div> : filteredBookings.map(b => (
                                         <div key={b.id} className="bg-white p-5 rounded-3xl border border-slate-100 flex gap-5 shadow-sm">
                                             <div className="bg-blue-50 text-blue-600 p-3 rounded-2xl text-center min-w-[65px] flex flex-col justify-center"><div className="text-sm font-black">{b.date?.split('-')[1]}/{b.date?.split('-')[2]}</div><div className="text-[10px] font-bold opacity-60 uppercase">{b.date?.split('-')[0]}</div></div>
-                                            <div className="flex-1"><div className="font-bold text-slate-700 flex justify-between items-start"><span>{b.reason}</span><button onClick={() => onDelete('bookings', b.id)} className="text-slate-200 hover:text-red-500 transition-colors"><Icon name="Trash2" size={16}/></button></div><div className="text-xs text-slate-400 mt-2 flex items-center gap-2 font-medium"><Icon name="Clock" size={14} className="text-blue-300"/> {b.startTime} - {b.endTime}</div><div className="text-xs text-slate-500 mt-1 font-black flex items-center gap-2 font-black"><Icon name="User" size={14} className="text-blue-300"/> {b.applicant}</div></div>
+                                            <div className="flex-1">
+                                                <div className="font-bold text-slate-700 flex justify-between items-start"><span>{b.reason}</span><button onClick={() => onDelete('bookings', b.id)} className="text-slate-200 hover:text-red-500 transition-colors"><Icon name="Trash2" size={16}/></button></div>
+                                                <div className="text-xs text-slate-400 mt-2 flex items-center gap-2 font-medium"><Icon name="Clock" size={14} className="text-blue-300"/> {b.startTime} - {b.endTime}</div>
+                                                <div className="text-xs text-slate-500 mt-1 font-black flex items-center gap-2 font-black"><Icon name="User" size={14} className="text-blue-300"/> {b.applicant}</div>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -261,8 +264,7 @@
                                     {filteredLogs.length === 0 ? <div className="text-center py-20 text-slate-300 font-bold text-sm">尚無行駛記錄</div> : filteredLogs.map(l => (
                                         <div key={l.id} className="bg-white p-5 rounded-3xl border border-slate-100 space-y-4 shadow-sm">
                                             <div className="flex justify-between items-center">
-                                                {/* 加上日期標題標籤 */}
-                                                <span className="text-[11px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded tracking-tighter uppercase">日期：{l.date}</span>
+                                                <span className="text-[11px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded tracking-tighter uppercase">日期：{l.date}</span>
                                                 <button onClick={() => onDelete('logs', l.id)} className="text-slate-200 hover:text-red-500 p-1"><Icon name="Trash2" size={16}/></button>
                                             </div>
                                             <div className="flex justify-between items-end gap-2">
@@ -291,12 +293,6 @@
                                         <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-50"><div className="text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest">累積油資</div><div className="text-2xl font-black text-slate-700 tracking-tighter">${stats.cost.toLocaleString()}</div></div>
                                         <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-50"><div className="text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest">平均油耗</div><div className="text-2xl font-black text-green-600 tracking-tighter">{stats.avg} <span className="text-[10px] font-bold opacity-60 uppercase font-mono">km/L</span></div></div>
                                     </div>
-                                    {dFilter === 'all' && stats.rank.length > 0 && (
-                                        <div className="bg-white rounded-[2rem] border border-slate-100 divide-y divide-slate-50 overflow-hidden shadow-sm">
-                                            <div className="p-4 bg-slate-50/50 text-[10px] font-black text-center text-slate-400 uppercase tracking-widest">駕駛里程排行</div>
-                                            {stats.rank.map(r => (<div key={r.n} className="p-4 flex justify-between items-center text-sm font-bold"><div className="flex items-center gap-3"><Icon name="User" size={16} className="text-blue-300"/> {r.n}</div><span className="text-slate-600 font-black">{r.v.toLocaleString()} <span className="text-[10px] font-bold opacity-50 uppercase font-mono">km</span></span></div>))}
-                                        </div>
-                                    )}
                                 </div>
                             )}
 
@@ -304,9 +300,9 @@
                                 <div className="space-y-6 animate-fade">
                                     <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 divide-y divide-slate-50 overflow-hidden">
                                         <div className="p-6">
-                                            <div className="flex justify-between items-center mb-5"><h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">系統人員管理</h3><button onClick={() => { setIsSettingsLocked(true); setCurrentTab('logs'); }} className="text-[10px] font-bold text-red-400 uppercase border border-red-100 px-2 py-1 rounded-full">鎖定系統</button></div>
+                                            <div className="flex justify-between items-center mb-5"><h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">系統人員管理</h3><button onClick={() => { setIsSettingsLocked(true); setCurrentTab('logs'); }} className="text-[10px] font-bold text-red-400 uppercase border border-red-100 px-2 py-1 rounded-full tap-active">鎖定系統</button></div>
                                             <div className="space-y-3">
-                                                {uData.map(u => (<div key={u.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl group"><span className="font-bold text-slate-700 flex items-center gap-3"><Icon name="User" size={18} className="text-blue-400"/> {u.name}</span><button onClick={() => onDelete('users', u.id)} className="text-red-200 hover:text-red-500 transition-colors p-1 active:scale-90"><Icon name="Trash2" size={18}/></button></div>))}
+                                                {uData.map(u => (<div key={u.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl group transition-all"><span className="font-bold text-slate-700 flex items-center gap-3"><Icon name="User" size={18} className="text-blue-400"/> {u.name}</span><button onClick={() => onDelete('users', u.id)} className="text-red-200 hover:text-red-500 transition-colors p-1 active:scale-90"><Icon name="Trash2" size={18}/></button></div>))}
                                                 <button onClick={() => setModal({open:true, type:'user', data:{}})} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm font-black flex items-center justify-center gap-2 tap-active transition-all uppercase tracking-tighter">+ 新增人員名單</button>
                                             </div>
                                         </div>
@@ -334,14 +330,14 @@
                                     <form onSubmit={handleVerifyPassword}>
                                         <input 
                                             autoFocus type="password" 
-                                            className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-center text-xl tracking-widest mb-4 outline-none focus:ring-2 focus:ring-blue-500" 
+                                            className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-center text-xl tracking-widest mb-4 outline-none focus:ring-2 focus:ring-blue-500 shadow-inner" 
                                             placeholder="••••••••" 
                                             value={passInput} 
                                             onChange={e => setPassInput(e.target.value)}
                                         />
                                         <div className="flex gap-3">
-                                            <button type="button" onClick={() => setPassModal(false)} className="flex-1 py-4 font-bold text-slate-400 bg-slate-100 rounded-2xl tap-active">取消</button>
-                                            <button type="submit" className="flex-1 py-4 font-bold text-white bg-blue-600 rounded-2xl tap-active shadow-lg">驗證</button>
+                                            <button type="button" onClick={() => setPassModal(false)} className="flex-1 py-4 font-bold text-slate-400 bg-slate-100 rounded-2xl tap-active transition-all">取消</button>
+                                            <button type="submit" className="flex-1 py-4 font-bold text-white bg-blue-600 rounded-2xl tap-active shadow-lg shadow-blue-100">驗證</button>
                                         </div>
                                     </form>
                                 </div>
@@ -354,38 +350,36 @@
                                 <div className="bg-white w-full max-w-[448px] rounded-t-[3.5rem] p-8 shadow-2xl animate-fade overflow-y-auto max-h-[90vh]">
                                     <div className="flex justify-between items-center mb-8 shrink-0"><h3 className="text-2xl font-black text-slate-800 tracking-tight tracking-tighter">{modal.type==='user'?'新增系統人員':modal.type==='booking'?'預約車輛登記':'新增行車記錄'}</h3><button onClick={() => setModal({...modal, open:false})} className="p-2.5 bg-slate-100 rounded-full text-slate-400 active:scale-90"><Icon name="X"/></button></div>
                                     <form onSubmit={onSave} className="space-y-6">
-                                        {modal.type === 'user' && (<div><label className="text-[10px] font-black text-slate-400 block mb-2 uppercase">人員全名</label><input required autoFocus className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none focus:ring-2 focus:ring-blue-500" placeholder="例如：林大明" onChange={e => setModal({...modal, data:{...modal.data, name: e.target.value}})}/></div>)}
+                                        {modal.type === 'user' && (<div><label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">人員全名</label><input required autoFocus className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none focus:ring-2 focus:ring-blue-500" placeholder="例如：林大明" onChange={e => setModal({...modal, data:{...modal.data, name: e.target.value}})}/></div>)}
                                         {modal.type === 'booking' && (<div className="space-y-4">
-                                            <div><label className="text-[10px] font-black text-slate-400 block mb-1 uppercase">預定日期</label><input required type="date" className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none" onChange={e => setModal({...modal, data:{...modal.data, date: e.target.value}})}/></div>
+                                            <div><label className="text-[10px] font-black text-slate-400 block mb-1 uppercase tracking-widest">預定日期</label><input required type="date" className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none" onChange={e => setModal({...modal, data:{...modal.data, date: e.target.value}})}/></div>
                                             <div className="flex gap-4">
-                                                <div className="flex-1"><label className="text-[10px] font-black text-slate-400 block mb-1">起始時間</label><input required type="time" className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700" onChange={e => setModal({...modal, data:{...modal.data, startTime: e.target.value}})}/></div>
-                                                <div className="flex-1"><label className="text-[10px] font-black text-slate-400 block mb-1">結束時間</label><input required type="time" className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700" onChange={e => setModal({...modal, data:{...modal.data, endTime: e.target.value}})}/></div>
+                                                <div className="flex-1"><label className="text-[10px] font-black text-slate-400 block mb-1 uppercase tracking-tighter">起始時間</label><input required type="time" className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700" onChange={e => setModal({...modal, data:{...modal.data, startTime: e.target.value}})}/></div>
+                                                <div className="flex-1"><label className="text-[10px] font-black text-slate-400 block mb-1 uppercase tracking-tighter">結束時間</label><input required type="time" className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700" onChange={e => setModal({...modal, data:{...modal.data, endTime: e.target.value}})}/></div>
                                             </div>
                                             <select required className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none" onChange={e => setModal({...modal, data:{...modal.data, applicant: e.target.value}})}><option value="">選擇人員</option>{uData.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}</select>
                                             <input required className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none" placeholder="用途事由" onChange={e => setModal({...modal, data:{...modal.data, reason: e.target.value}})}/>
                                         </div>)}
                                         {modal.type === 'log' && (<div className="space-y-4">
-                                            <div><label className="text-[10px] font-black text-slate-400 block mb-1 uppercase">實際行駛日期</label><input required type="date" className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none" onChange={e => setModal({...modal, data:{...modal.data, date: e.target.value}})}/></div>
-                                            <div className="flex gap-4">
-                                                <div className="flex-1"><label className="text-[10px] font-bold text-slate-400 mb-1 block ml-1 uppercase">起始里程</label><input required type="number" className="w-full bg-slate-50 border-0 rounded-2xl p-4 font-black text-slate-700 outline-none" onChange={e => setModal({...modal, data:{...modal.data, startMileage: e.target.value}})}/></div>
-                                                <div className="flex-1"><label className="text-[10px] font-bold text-slate-400 mb-1 block ml-1 uppercase">結束里程</label><input required type="number" className="w-full bg-slate-50 border-0 rounded-2xl p-4 font-black text-slate-700 outline-none" onChange={e => setModal({...modal, data:{...modal.data, endMileage: e.target.value}})}/></div>
+                                            <div><label className="text-[10px] font-black text-slate-400 block mb-1 uppercase tracking-widest">實際行駛日期</label><input required type="date" className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none" onChange={e => setModal({...modal, data:{...modal.data, date: e.target.value}})}/></div>
+                                            <div className="flex gap-3">
+                                                <div className="flex-1"><label className="text-[10px] font-bold text-slate-400 mb-1 block ml-1 uppercase tracking-tighter">起始里程</label><input required type="number" className="w-full bg-slate-50 border-0 rounded-2xl p-4 font-black text-slate-700 outline-none" onChange={e => setModal({...modal, data:{...modal.data, startMileage: e.target.value}})}/></div>
+                                                <div className="flex-1"><label className="text-[10px] font-bold text-slate-400 mb-1 block ml-1 uppercase tracking-tighter">結束里程</label><input required type="number" className="w-full bg-slate-50 border-0 rounded-2xl p-4 font-black text-slate-700 outline-none" onChange={e => setModal({...modal, data:{...modal.data, endMileage: e.target.value}})}/></div>
                                             </div>
                                             
-                                            {/* 修復後的加油欄位排版 */}
-                                            <div className="bg-amber-50/50 p-6 rounded-3xl border border-amber-100/50 space-y-4">
+                                            <div className="bg-amber-50/50 p-5 rounded-3xl border border-amber-100/50 space-y-3">
                                                 <div className="text-[10px] font-black text-amber-600 flex items-center gap-1.5 uppercase tracking-widest"><Icon name="Fuel" size={12}/> 加油紀錄 (選填)</div>
-                                                <div className="flex gap-3">
-                                                    <div className="flex-1"><label className="text-[10px] font-bold text-amber-500 mb-1 block">金額</label><input type="number" placeholder="$0" className="w-full bg-white border-0 rounded-xl p-4 text-sm font-black text-amber-700 shadow-sm" onChange={e => setModal({...modal, data:{...modal.data, fuelCost: e.target.value}})}/></div>
-                                                    <div className="flex-1"><label className="text-[10px] font-bold text-amber-500 mb-1 block">公升</label><input type="number" step="0.01" placeholder="0L" className="w-full bg-white border-0 rounded-xl p-4 text-sm font-black text-amber-700 shadow-sm" onChange={e => setModal({...modal, data:{...modal.data, fuelLiters: e.target.value}})}/></div>
+                                                <div className="flex gap-2">
+                                                    <div className="flex-1"><label className="text-[9px] font-bold text-amber-500 mb-1 block uppercase">金額</label><input type="number" placeholder="$0" className="w-full bg-white border-0 rounded-xl p-3 text-sm font-black text-amber-700 shadow-sm" onChange={e => setModal({...modal, data:{...modal.data, fuelCost: e.target.value}})}/></div>
+                                                    <div className="flex-1"><label className="text-[9px] font-bold text-amber-500 mb-1 block uppercase">公升</label><input type="number" step="0.01" placeholder="0L" className="w-full bg-white border-0 rounded-xl p-3 text-sm font-black text-amber-700 shadow-sm" onChange={e => setModal({...modal, data:{...modal.data, fuelLiters: e.target.value}})}/></div>
                                                 </div>
                                             </div>
 
                                             <select required className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none" onChange={e => setModal({...modal, data:{...modal.data, userId: e.target.value}})}><option value="">選擇駕駛員</option>{uData.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}</select>
                                             
-                                            {/* 修復後的用途備註寬度與換行 */}
                                             <div className="space-y-4">
                                                 <input required className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none" placeholder="行駛目的地" onChange={e => setModal({...modal, data:{...modal.data, destination: e.target.value}})}/>
-                                                <textarea required rows="2" className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none resize-none" placeholder="用途備註 (長度已優化)" onChange={e => setModal({...modal, data:{...modal.data, reason: e.target.value}})}></textarea>
+                                                <textarea required rows="2" className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none resize-none overflow-hidden" placeholder="用途備註" onChange={e => setModal({...modal, data:{...modal.data, reason: e.target.value}})}></textarea>
                                             </div>
                                         </div>)}
                                         <button type="submit" className="w-full bg-slate-900 text-white py-6 rounded-[2rem] font-black shadow-xl tap-active transition-all text-lg uppercase tracking-widest">確認儲存數據</button>
@@ -397,9 +391,9 @@
                 );
             };
 
-            const mountPoint = document.getElementById('root');
-            if (mountPoint) {
-                ReactDOM.createRoot(mountPoint).render(<App />);
+            const mount = document.getElementById('root');
+            if (mount) {
+                ReactDOM.createRoot(mount).render(<App />);
             }
         })();
     </script>
