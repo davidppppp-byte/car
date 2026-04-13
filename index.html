@@ -5,22 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>公務車雲端管理系統</title>
     
-    <!-- 基礎框架 (順序不可更動) -->
+    <!-- 1. 核心框架 (嚴格載入順序) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- 預先定義 Lucide React 依賴 -->
+    <!-- 2. Lucide 圖示依賴修復 -->
     <script>
         window.react = window.React;
         window.reactDOM = window.ReactDOM;
     </script>
     <script src="https://unpkg.com/lucide-react@0.344.0/dist/umd/lucide-react.js"></script>
 
-    <!-- 編譯引擎 -->
+    <!-- 3. 編譯引擎 (使用相容性較高的版本) -->
     <script src="https://unpkg.com/@babel/standalone@7.24.2/babel.min.js"></script>
 
-    <!-- Firebase Compat SDK (相容模式) -->
+    <!-- 4. Firebase 相容版 SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -46,6 +46,7 @@
         .animate-fade { animation: fadeIn 0.3s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .tap-active:active { transform: scale(0.96); }
+        input, select { font-size: 16px !important; } /* 防止 iOS 自動縮放 */
     </style>
 </head>
 <body>
@@ -59,18 +60,18 @@
     <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
 
     <script type="text/babel">
-        // 腳本封裝以解決 Infinity 與 Script Error
+        // 腳本封裝隔離
         (function() {
             const { useState, useEffect, useMemo } = React;
-            const icons = window.LucideReact || {};
+            const lucideIcons = window.LucideReact || {};
 
-            // 安全圖示解析器
+            // 安全圖示渲染組件
             const Icon = ({ name, size = 20, className = "" }) => {
-                const Comp = icons[name];
+                const Comp = lucideIcons[name];
                 return Comp ? <Comp size={size} className={className} /> : <div style={{width:size, height:size}} className="bg-slate-200 rounded" />;
             };
 
-            // --- Firebase 配置 (使用您的專案資訊) ---
+            // --- Firebase 配置 ---
             const firebaseConfig = {
                 apiKey: "AIzaSyAfi4RC-H3lOSQJ_Ja_oUSvl-OuOqgYQiE",
                 authDomain: "deafcar-4179b.firebaseapp.com",
@@ -83,7 +84,7 @@
             if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
             const db = firebase.firestore();
             const auth = firebase.auth();
-            const STORAGE_KEY = "deafcar-fleet-production"; 
+            const COLLECTION_ROOT = "deafcar-fleet-v11"; 
 
             const VEHICLES = [
                 { id: 'BFG-2353', name: '自排得利卡', plate: 'BFG-2353', type: 'van', hasBooking: false },
@@ -97,7 +98,7 @@
                 const [activeCar, setActiveCar] = useState(null);
                 const [currentTab, setCurrentTab] = useState('logs');
                 const [isAuthed, setIsAuthed] = useState(false);
-                const [isSettingsLocked, setIsSettingsLocked] = useState(true); // 管理密碼鎖定狀態
+                const [isSettingsLocked, setIsSettingsLocked] = useState(true);
                 
                 const [uData, setUData] = useState([]);
                 const [bData, setBData] = useState([]);
@@ -107,17 +108,17 @@
                 const [mFilter, setMFilter] = useState(new Date().toISOString().substring(0, 7));
                 const [dFilter, setDFilter] = useState('all');
 
-                // 1. 初始化身分驗證
+                // 1. 初始化登入
                 useEffect(() => {
                     auth.signInAnonymously()
                         .then(() => setIsAuthed(true))
                         .catch(err => console.error("Firebase Login Error", err));
                 }, []);
 
-                // 2. 監聽 Firestore 資料
+                // 2. 監聽 Firestore
                 useEffect(() => {
                     if (!isAuthed) return;
-                    const ref = db.collection('artifacts').doc(STORAGE_KEY).collection('public').doc('data');
+                    const ref = db.collection('artifacts').doc(COLLECTION_ROOT).collection('public').doc('data');
 
                     const uUnsub = ref.collection('users').onSnapshot(s => setUData(s.docs.map(d => ({id: d.id, ...d.data()}))));
                     const bUnsub = ref.collection('bookings').onSnapshot(s => setBData(s.docs.map(d => ({id: d.id, ...d.data()}))));
@@ -126,27 +127,26 @@
                     return () => { uUnsub(); bUnsub(); lUnsub(); };
                 }, [isAuthed]);
 
-                // 密碼檢查邏輯
+                // 密碼保護功能
                 const checkPassword = () => {
                     const pass = prompt("請輸入管理設定密碼：");
                     if (pass === "22369055") {
                         setIsSettingsLocked(false);
                         setCurrentTab('settings');
                     } else if (pass !== null) {
-                        alert("密碼錯誤！無法進入設定。");
+                        alert("密碼不正確！");
                     }
                 };
 
-                // 分頁切換攔截
-                const handleTabClick = (newTab) => {
-                    if (newTab === 'settings' && isSettingsLocked) {
+                const handleTabChange = (target) => {
+                    if (target === 'settings' && isSettingsLocked) {
                         checkPassword();
                     } else {
-                        setCurrentTab(newTab);
+                        setCurrentTab(target);
                     }
                 };
 
-                // 資料過濾與統計
+                // 資料計算
                 const filteredBookings = useMemo(() => {
                     if (!activeCar) return [];
                     return bData.filter(b => b.vehicleId === activeCar.id)
@@ -170,60 +170,67 @@
                     if (mFilter !== 'all') list = list.filter(l => l.date && l.date.startsWith(mFilter));
                     if (dFilter !== 'all') list = list.filter(l => l.userId === dFilter);
 
-                    const totalMileage = list.reduce((a, b) => a + (Number(b.totalMileage) || 0), 0);
-                    const totalCost = list.reduce((a, b) => a + (Number(b.fuelCost) || 0), 0);
-                    const totalFuel = list.reduce((a, b) => a + (Number(b.fuelLiters) || 0), 0);
+                    const mileage = list.reduce((a, b) => a + (Number(b.totalMileage) || 0), 0);
+                    const cost = list.reduce((a, b) => a + (Number(b.fuelCost) || 0), 0);
+                    const fuel = list.reduce((a, b) => a + (Number(b.fuelLiters) || 0), 0);
                     
-                    const drivers = {};
-                    list.forEach(i => { if(i.userId) drivers[i.userId] = (drivers[i.userId] || 0) + (Number(i.totalMileage) || 0); });
+                    const drvs = {};
+                    list.forEach(i => { if(i.userId) drvs[i.userId] = (drvs[i.userId] || 0) + (Number(i.totalMileage) || 0); });
 
                     return {
-                        totalMileage, totalCost, totalFuel,
-                        avg: totalFuel > 0 ? (totalMileage / totalFuel).toFixed(2) : 0,
-                        rank: Object.entries(drivers).map(([n, v]) => ({n, v})).sort((a,b) => b.v - a.v)
+                        mileage, cost, fuel,
+                        avg: fuel > 0 ? (mileage / fuel).toFixed(2) : 0,
+                        rank: Object.entries(drvs).map(([n, v]) => ({n, v})).sort((a,b) => b.v - a.v)
                     };
                 }, [filteredLogs, mFilter, dFilter]);
 
+                // 儲存邏輯 (修復新增人員按鈕)
                 const onSave = async (e) => {
                     e.preventDefault();
-                    const coll = db.collection('artifacts').doc(STORAGE_KEY).collection('public').doc('data').collection(modal.type === 'user' ? 'users' : modal.type === 'booking' ? 'bookings' : 'logs');
+                    if (!isAuthed) return;
                     
-                    let docData = { ...modal.data };
-                    if (modal.type !== 'user') docData.vehicleId = activeCar.id;
-                    docData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    const collName = modal.type === 'user' ? 'users' : (modal.type === 'booking' ? 'bookings' : 'logs');
+                    const coll = db.collection('artifacts').doc(COLLECTION_ROOT).collection('public').doc('data').collection(collName);
+                    
+                    let doc = { ...modal.data };
+                    if (modal.type !== 'user') doc.vehicleId = activeCar.id;
+                    doc.createdAt = firebase.firestore.FieldValue.serverTimestamp();
 
                     if (modal.type === 'log') {
-                        const s = Number(docData.startMileage || 0);
-                        const eM = Number(docData.endMileage || 0);
-                        docData.totalMileage = eM - s;
-                        docData.fuelCost = Number(docData.fuelCost || 0);
-                        docData.fuelLiters = Number(docData.fuelLiters || 0);
+                        const sM = Number(doc.startMileage || 0);
+                        const eM = Number(doc.endMileage || 0);
+                        doc.totalMileage = eM - sM;
+                        doc.fuelCost = Number(doc.fuelCost || 0);
+                        doc.fuelLiters = Number(doc.fuelLiters || 0);
                     }
 
-                    await coll.add(docData);
-                    setModal({ open: false, type: '', data: {} });
+                    try {
+                        await coll.add(doc);
+                        setModal({ open: false, type: '', data: {} });
+                    } catch (err) {
+                        alert("儲存失敗，請檢查權限。");
+                    }
                 };
 
                 const onDelete = async (coll, id) => {
                     if (!window.confirm('確定要永久刪除此項記錄嗎？')) return;
-                    await db.collection('artifacts').doc(STORAGE_KEY).collection('public').doc('data').collection(coll).doc(id).delete();
+                    await db.collection('artifacts').doc(COLLECTION_ROOT).collection('public').doc('data').collection(coll).doc(id).delete();
                 };
 
-                const onExportCSV = () => {
+                const exportCSV = () => {
                     if (filteredLogs.length === 0) return;
-                    const h = ["日期", "駕駛", "里程起", "里程迄", "行駛里程", "油資金額", "公升數", "地點", "事由"];
+                    const h = ["日期", "駕駛", "起", "迄", "總里程", "油資", "公升", "地點", "事由"];
                     const b = filteredLogs.map(l => [l.date, l.userId, l.startMileage, l.endMileage, l.totalMileage, l.fuelCost || 0, l.fuelLiters || 0, l.destination, l.reason]);
                     const csv = "\uFEFF" + [h.join(","), ...b.map(r => r.join(","))].join("\n");
-                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
                     const link = document.createElement("a");
-                    link.href = URL.createObjectURL(blob);
+                    link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
                     link.download = `${activeCar.plate}_行車報表.csv`;
                     link.click();
                 };
 
                 if (!isAuthed) return null;
 
-                // 畫面 A：車輛選擇器
+                // 車輛選擇首頁
                 if (!activeCar) {
                     return (
                         <div className="app-container p-6 animate-fade">
@@ -231,8 +238,8 @@
                                 <div className="w-16 h-16 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-xl shadow-blue-100">
                                     <Icon name="Car" size={32} className="text-white" />
                                 </div>
-                                <h1 className="text-2xl font-black text-slate-800 tracking-tight">公務車隊管理系統</h1>
-                                <p className="text-slate-400 text-xs mt-2 font-bold tracking-widest uppercase">Fleet Management</p>
+                                <h1 className="text-2xl font-black text-slate-800 tracking-tight">公務車管理系統</h1>
+                                <p className="text-slate-400 text-xs mt-2 font-bold uppercase tracking-widest">Beitun District Fleet</p>
                             </div>
                             <div className="grid gap-4">
                                 {VEHICLES.map(v => (
@@ -252,7 +259,6 @@
                     );
                 }
 
-                // 畫面 B：管理介面
                 return (
                     <div className="app-container relative overflow-hidden animate-fade">
                         <header className="bg-white border-b px-4 py-3 flex justify-between items-center shrink-0 z-10">
@@ -267,24 +273,11 @@
                         <main className="flex-1 overflow-y-auto p-5 pb-28">
                             {currentTab === 'bookings' && activeCar.hasBooking && (
                                 <div className="space-y-5 animate-fade">
-                                    <div className="flex justify-between items-center">
-                                        <h2 className="font-black text-slate-800 text-lg flex items-center gap-2"><Icon name="Calendar" className="text-blue-500"/> 預約表</h2>
-                                        <button onClick={() => setModal({open:true, type:'booking', data:{}})} className="bg-blue-600 text-white p-2.5 rounded-full shadow-lg tap-active"><Icon name="Plus"/></button>
-                                    </div>
-                                    {filteredBookings.length === 0 ? <div className="text-center py-20 text-slate-300 text-sm">目前無人預約</div> : filteredBookings.map(b => (
+                                    <div className="flex justify-between items-center"><h2 className="font-black text-slate-800 text-lg flex items-center gap-2"><Icon name="Calendar" className="text-blue-500"/> 預約表</h2><button onClick={() => setModal({open:true, type:'booking', data:{}})} className="bg-blue-600 text-white p-2.5 rounded-full shadow-lg tap-active"><Icon name="Plus"/></button></div>
+                                    {filteredBookings.length === 0 ? <div className="text-center py-20 text-slate-300 font-bold text-sm">目前尚無預約資料</div> : filteredBookings.map(b => (
                                         <div key={b.id} className="bg-white p-5 rounded-3xl border border-slate-100 flex gap-5 shadow-sm">
-                                            <div className="bg-blue-50 text-blue-600 p-3 rounded-2xl text-center min-w-[65px] flex flex-col justify-center">
-                                                <div className="text-sm font-black">{b.date?.split('-')[1]}/{b.date?.split('-')[2]}</div>
-                                                <div className="text-[10px] font-bold opacity-60 uppercase">{b.date?.split('-')[0]}</div>
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="font-bold text-slate-700 flex justify-between items-start">
-                                                    <span>{b.reason}</span>
-                                                    <button onClick={() => onDelete('bookings', b.id)} className="text-slate-200 hover:text-red-500"><Icon name="Trash2" size={16}/></button>
-                                                </div>
-                                                <div className="text-xs text-slate-400 mt-2 font-medium flex items-center gap-2"><Icon name="Clock" size={14} className="text-blue-300"/> {b.startTime} - {b.endTime}</div>
-                                                <div className="text-xs text-slate-500 mt-1 font-black flex items-center gap-2"><Icon name="User" size={14} className="text-blue-300"/> {b.applicant}</div>
-                                            </div>
+                                            <div className="bg-blue-50 text-blue-600 p-3 rounded-2xl text-center min-w-[65px] flex flex-col justify-center"><div className="text-sm font-black">{b.date?.split('-')[1]}/{b.date?.split('-')[2]}</div><div className="text-[10px] font-bold opacity-60 uppercase">{b.date?.split('-')[0]}</div></div>
+                                            <div className="flex-1"><div className="font-bold text-slate-700 flex justify-between items-start"><span>{b.reason}</span><button onClick={() => onDelete('bookings', b.id)} className="text-slate-200 hover:text-red-500 transition-colors"><Icon name="Trash2" size={16}/></button></div><div className="text-xs text-slate-400 mt-2 font-medium flex items-center gap-2"><Icon name="Clock" size={14} className="text-blue-300"/> {b.startTime} - {b.endTime}</div><div className="text-xs text-slate-500 mt-1 font-black flex items-center gap-2"><Icon name="User" size={14} className="text-blue-300"/> {b.applicant}</div></div>
                                         </div>
                                     ))}
                                 </div>
@@ -292,19 +285,12 @@
 
                             {currentTab === 'logs' && (
                                 <div className="space-y-5 animate-fade">
-                                    <div className="flex justify-between items-center">
-                                        <h2 className="font-black text-slate-800 text-lg flex items-center gap-2"><Icon name="ClipboardList" className="text-green-500"/> 行車記錄</h2>
-                                        <button onClick={() => setModal({open:true, type:'log', data:{}})} className="bg-green-600 text-white p-2.5 rounded-full shadow-lg tap-active"><Icon name="Plus"/></button>
-                                    </div>
-                                    {filteredLogs.length === 0 ? <div className="text-center py-20 text-slate-300 text-sm">無行駛記錄</div> : filteredLogs.map(l => (
+                                    <div className="flex justify-between items-center"><h2 className="font-black text-slate-800 text-lg flex items-center gap-2"><Icon name="ClipboardList" className="text-green-500"/> 行車記錄</h2><button onClick={() => setModal({open:true, type:'log', data:{}})} className="bg-green-600 text-white p-2.5 rounded-full shadow-lg tap-active"><Icon name="Plus"/></button></div>
+                                    {filteredLogs.length === 0 ? <div className="text-center py-20 text-slate-300 font-bold text-sm">無行駛記錄</div> : filteredLogs.map(l => (
                                         <div key={l.id} className="bg-white p-5 rounded-3xl border border-slate-100 space-y-4 shadow-sm">
                                             <div className="flex justify-between items-center"><span className="text-[11px] font-black text-slate-400 bg-slate-50 px-2 py-1 rounded uppercase">{l.date}</span><button onClick={() => onDelete('logs', l.id)} className="text-slate-200 hover:text-red-500 p-1"><Icon name="Trash2" size={16}/></button></div>
                                             <div className="flex justify-between items-end"><div className="flex-1"><div className="font-bold text-slate-800 text-lg flex items-center gap-1.5"><Icon name="MapPin" size={16} className="text-red-400"/> {l.destination}</div><div className="text-xs text-slate-400 mt-1 font-medium">{l.userId} | {l.reason}</div></div><div className="text-right text-green-600 font-black"><span className="text-2xl">+{l.totalMileage}</span><span className="text-[10px] ml-1 uppercase font-bold">km</span></div></div>
-                                            <div className="flex gap-2 pt-3 border-t border-slate-50">
-                                                <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase">起 {l.startMileage}</div>
-                                                <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase">迄 {l.endMileage}</div>
-                                                {l.fuelCost > 0 && <div className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg inline-flex items-center gap-1"><Icon name="Fuel" size={10}/> ${l.fuelCost}</div>}
-                                            </div>
+                                            {l.fuelCost > 0 && <div className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg inline-flex items-center gap-1"><Icon name="Fuel" size={10}/> ${l.fuelCost} / {l.fuelLiters}L</div>}
                                         </div>
                                     ))}
                                 </div>
@@ -319,15 +305,15 @@
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="col-span-2 bg-blue-600 p-6 rounded-[2.5rem] text-white shadow-xl shadow-blue-100 relative overflow-hidden">
                                             <div className="text-xs font-black opacity-70 uppercase tracking-widest mb-1">本月行駛總里程</div>
-                                            <div className="text-5xl font-black tracking-tighter">{stats.totalMileage.toLocaleString()} <span className="text-base font-normal opacity-60">km</span></div>
+                                            <div className="text-5xl font-black tracking-tighter">{stats.mileage.toLocaleString()} <span className="text-base font-normal opacity-60 uppercase">km</span></div>
                                             <div className="absolute -right-4 -bottom-4 opacity-10"><Icon name="BarChart3" size={120}/></div>
                                         </div>
-                                        <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-50"><div className="text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest">累積油資</div><div className="text-2xl font-black text-slate-700 tracking-tighter">${stats.totalCost.toLocaleString()}</div></div>
+                                        <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-50"><div className="text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest">累積油資</div><div className="text-2xl font-black text-slate-700 tracking-tighter">${stats.cost.toLocaleString()}</div></div>
                                         <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-50"><div className="text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest">平均油耗</div><div className="text-2xl font-black text-green-600 tracking-tighter">{stats.avg} <span className="text-[10px] font-bold opacity-60 uppercase">km/L</span></div></div>
                                     </div>
                                     {dFilter === 'all' && stats.rank.length > 0 && (
                                         <div className="bg-white rounded-[2rem] border border-slate-100 divide-y divide-slate-50 overflow-hidden shadow-sm">
-                                            <div className="p-4 bg-slate-50/50 text-[10px] font-black text-center text-slate-400 uppercase tracking-widest">駕駛里程分佈</div>
+                                            <div className="p-4 bg-slate-50/50 text-[10px] font-black text-center text-slate-400 uppercase tracking-widest">駕駛里程排行</div>
                                             {stats.rank.map(r => (<div key={r.n} className="p-4 flex justify-between items-center text-sm font-bold"><div className="flex items-center gap-3"><Icon name="User" size={16} className="text-blue-300"/> {r.n}</div><span className="text-slate-600 font-black">{r.v.toLocaleString()} <span className="text-[10px] font-bold opacity-50 uppercase font-mono">km</span></span></div>))}
                                         </div>
                                     )}
@@ -349,7 +335,7 @@
                                         <div className="p-6">
                                             <div className="flex justify-between items-center mb-5">
                                                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">人員清單管理</h3>
-                                                <button onClick={() => setIsSettingsLocked(true)} className="text-[10px] font-bold text-red-400 uppercase border border-red-100 px-2 py-1 rounded-full">登出管理模式</button>
+                                                <button onClick={() => setIsSettingsLocked(true)} className="text-[10px] font-bold text-red-400 uppercase border border-red-100 px-2 py-1 rounded-full">鎖定設定</button>
                                             </div>
                                             <div className="space-y-3">
                                                 {uData.map(u => (<div key={u.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl group"><span className="font-bold text-slate-700 flex items-center gap-3"><Icon name="User" size={18} className="text-blue-400"/> {u.name}</span><button onClick={() => onDelete('users', u.id)} className="text-red-200 hover:text-red-500 transition-colors p-1 active:scale-90"><Icon name="Trash2" size={18}/></button></div>))}
@@ -362,10 +348,10 @@
                         </main>
 
                         <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[448px] bg-white/95 backdrop-blur-xl border-t border-slate-100 flex justify-around py-4 pb-8 z-40 shadow-inner">
-                            {activeCar.hasBooking && (<button onClick={() => handleTabClick('bookings')} className={`flex flex-col items-center gap-1.5 transition-all ${currentTab==='bookings'?'text-blue-600 scale-110 font-black':'text-slate-300'}`}><Icon name="Calendar" size={22}/><span className="text-[10px] uppercase font-bold">預約</span></button>)}
-                            <button onClick={() => handleTabClick('logs')} className={`flex flex-col items-center gap-1.5 transition-all ${currentTab==='logs'?'text-green-600 scale-110 font-black':'text-slate-300'}`}><Icon name="ClipboardList" size={22}/><span className="text-[10px] uppercase font-bold">記錄</span></button>
-                            <button onClick={() => handleTabClick('dashboard')} className={`flex flex-col items-center gap-1.5 transition-all ${currentTab==='dashboard'?'text-purple-600 scale-110 font-black':'text-slate-300'}`}><Icon name="BarChart3" size={22}/><span className="text-[10px] uppercase font-bold">統計</span></button>
-                            <button onClick={() => handleTabClick('settings')} className={`flex flex-col items-center gap-1.5 transition-all ${currentTab==='settings'?'text-slate-900 scale-110 font-black':'text-slate-300'}`}><Icon name="Settings" size={22}/><span className="text-[10px] uppercase font-bold">設定</span></button>
+                            {activeCar.hasBooking && (<button onClick={() => handleTabChange('bookings')} className={`flex flex-col items-center gap-1.5 transition-all ${currentTab==='bookings'?'text-blue-600 scale-110 font-black':'text-slate-300'}`}><Icon name="Calendar" size={22}/><span className="text-[10px] uppercase font-bold">預約</span></button>)}
+                            <button onClick={() => handleTabChange('logs')} className={`flex flex-col items-center gap-1.5 transition-all ${currentTab==='logs'?'text-green-600 scale-110 font-black':'text-slate-300'}`}><Icon name="ClipboardList" size={22}/><span className="text-[10px] uppercase font-bold">記錄</span></button>
+                            <button onClick={() => handleTabChange('dashboard')} className={`flex flex-col items-center gap-1.5 transition-all ${currentTab==='dashboard'?'text-purple-600 scale-110 font-black':'text-slate-300'}`}><Icon name="BarChart3" size={22}/><span className="text-[10px] uppercase font-bold">統計</span></button>
+                            <button onClick={() => handleTabChange('settings')} className={`flex flex-col items-center gap-1.5 transition-all ${currentTab==='settings'?'text-slate-900 scale-110 font-black':'text-slate-300'}`}><Icon name="Settings" size={22}/><span className="text-[10px] uppercase font-bold">設定</span></button>
                         </nav>
 
                         {modal.open && (
@@ -373,7 +359,7 @@
                                 <div className="bg-white w-full max-w-[448px] rounded-t-[3.5rem] p-8 shadow-2xl animate-fade overflow-y-auto max-h-[90vh]">
                                     <div className="flex justify-between items-center mb-8 shrink-0"><h3 className="text-2xl font-black text-slate-800 tracking-tight tracking-tighter">{modal.type==='user'?'新增系統人員':modal.type==='booking'?'預約車輛登記':'新增行車記錄'}</h3><button onClick={() => setModal({...modal, open:false})} className="p-2.5 bg-slate-100 rounded-full text-slate-400 active:scale-90"><Icon name="X"/></button></div>
                                     <form onSubmit={onSave} className="space-y-6">
-                                        {modal.type === 'user' && (<div><label className="text-[10px] font-black text-slate-400 block mb-2 uppercase">姓名全名</label><input required autoFocus className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none focus:ring-2 focus:ring-blue-500" placeholder="林大明" onChange={e => setModal({...modal, data:{...modal.data, name: e.target.value}})}/></div>)}
+                                        {modal.type === 'user' && (<div><label className="text-[10px] font-black text-slate-400 block mb-2 uppercase">姓名全名</label><input required autoFocus className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none focus:ring-2 focus:ring-blue-500" placeholder="例如：林大明" onChange={e => setModal({...modal, data:{...modal.data, name: e.target.value}})}/></div>)}
                                         {modal.type === 'booking' && (<div className="space-y-4">
                                             <input required type="date" className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none" onChange={e => setModal({...modal, data:{...modal.data, date: e.target.value}})}/>
                                             <div className="flex gap-4"><input required type="time" className="flex-1 bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700" onChange={e => setModal({...modal, data:{...modal.data, startTime: e.target.value}})}/><input required type="time" className="flex-1 bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700" onChange={e => setModal({...modal, data:{...modal.data, endTime: e.target.value}})}/></div>
@@ -393,7 +379,7 @@
                                             <select required className="w-full bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none" onChange={e => setModal({...modal, data:{...modal.data, userId: e.target.value}})}><option value="">選擇駕駛員</option>{uData.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}</select>
                                             <div className="flex gap-4"><input required className="flex-1 bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none" placeholder="目的地" onChange={e => setModal({...modal, data:{...modal.data, destination: e.target.value}})}/><input required className="flex-1 bg-slate-50 border-0 rounded-2xl p-5 font-black text-slate-700 outline-none" placeholder="用途備註" onChange={e => setModal({...modal, data:{...modal.data, reason: e.target.value}})}/></div>
                                         </div>)}
-                                        <button className="w-full bg-slate-900 text-white py-6 rounded-[2rem] font-black shadow-xl tap-active transition-all text-lg uppercase tracking-widest">確認儲存數據</button>
+                                        <button type="submit" className="w-full bg-slate-900 text-white py-6 rounded-[2rem] font-black shadow-xl tap-active transition-all text-lg uppercase tracking-widest">確認儲存數據</button>
                                     </form>
                                 </div>
                             </div>
@@ -402,8 +388,8 @@
                 );
             };
 
-            const rootEl = document.getElementById('root');
-            if (rootEl) ReactDOM.createRoot(rootEl).render(<App />);
+            const rootNode = document.getElementById('root');
+            if (rootNode) ReactDOM.createRoot(rootNode).render(<App />);
         })();
     </script>
 </body>
